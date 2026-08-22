@@ -1,0 +1,26 @@
+{
+  "Version": "2012-10-17",
+  "Statement": [
+    {
+      "Sid": "Logs",
+      "Effect": "Allow",
+      "Action": ["logs:CreateLogGroup", "logs:CreateLogStream", "logs:PutLogEvents"],
+      "Resource": "arn:aws:logs:{{REGION}}:{{ACCOUNT_ID}}:log-group:/aws/lambda/emergencias-notification*:*"
+    },
+    {
+      "Sid": "ConfigNoSensible",
+      "Effect": "Allow",
+      "Action": ["ssm:GetParametersByPath", "ssm:GetParameter", "ssm:GetParameters"],
+      "Resource": "arn:aws:ssm:{{REGION}}:{{ACCOUNT_ID}}:parameter/emergencias/prod/common/*"
+    },
+    {
+      "Sid": "CredencialSupabaseYWebhooks",
+      "Effect": "Allow",
+      "Action": "secretsmanager:GetSecretValue",
+      "Resource": [
+        "arn:aws:secretsmanager:{{REGION}}:{{ACCOUNT_ID}}:secret:emergencias/prod/supabase-*",
+        "arn:aws:secretsmanager:{{REGION}}:{{ACCOUNT_ID}}:secret:emergencias/prod/notification-*"
+      ]
+    }
+  ]
+}

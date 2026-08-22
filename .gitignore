@@ -1,0 +1,19 @@
+# Dependencies
+node_modules/
+
+# Env / secrets — nunca en el repo (requisito explícito del taller)
+.env
+.env.*
+!.env.example
+
+# Build output
+dist/
+.next/
+out/
+
+# Copia sincronizada de services/_shared dentro de cada servicio
+# (generada por services/sync-shared.js; la fuente única de verdad es _shared/)
+services/*/src/shared/
+
+# OS / editor
+.DS_Store
