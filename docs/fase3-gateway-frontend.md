@@ -37,7 +37,7 @@ y que ya hayas hecho `services/build-and-push.sh` (Fase 2) + creado los roles IA
 sam deploy \
   --template-file infra/template.yaml \
   --stack-name emergencias-api \
-  --capabilities CAPABILITY_IAM \
+  --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
   --parameter-overrides \
     IntakeTriageImageUri=<ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/emergencias/intake-triage:latest \
     DispatchImageUri=<ACCOUNT_ID>.dkr.ecr.us-east-1.amazonaws.com/emergencias/dispatch:latest \

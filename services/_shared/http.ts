@@ -1,5 +1,6 @@
 import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from 'aws-lambda';
 import { logger } from './logger';
+import { maybeInjectChaos } from './chaos';
 
 const CORS_HEADERS = {
   'Access-Control-Allow-Origin': process.env.CORS_ORIGIN ?? 'https://TU-APP.vercel.app',
@@ -58,6 +59,7 @@ export function withErrorHandling(handler: Handler): Handler {
     }
 
     try {
+      maybeInjectChaos();
       return await handler(event);
     } catch (error) {
       if (error instanceof HttpError) {

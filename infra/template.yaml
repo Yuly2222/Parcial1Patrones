@@ -1,9 +1,10 @@
 AWSTemplateFormatVersion: '2010-09-09'
 Transform: AWS::Serverless-2016-10-31
 Description: >
-  Fase 3 — API Gateway (HTTP API, stage prod) enrutando hacia los 4 microservicios
-  en contenedor (Fase 2). Las imágenes ya están publicadas en ECR por
-  services/build-and-push.sh; este template NO construye las imágenes, solo las referencia.
+  API Gateway (HTTP API, stage prod) enrutando hacia los 4 microservicios en contenedor
+  (Fase 2), con despliegue progresivo Canary y rollback automático (Fase 4, Opción A). Las
+  imágenes ya están publicadas en ECR por services/build-and-push.sh; este template NO
+  construye las imágenes, solo las referencia.
 
 Parameters:
   IntakeTriageImageUri:
@@ -39,6 +40,20 @@ Parameters:
     Type: Number
     Default: 300
     Description: Límite de requests por IP en una ventana de 5 min (regla WAF), mínimo 100
+  LatencyThresholdMs:
+    Type: Number
+    Default: 1500
+    Description: Umbral de latencia (p99, ms) para intake-triage/dispatch/notification. Geospatial usa uno propio más alto (ver comentario).
+  ChaosErrorRatePercent:
+    Type: Number
+    Default: 0
+    MinValue: 0
+    MaxValue: 100
+    Description: >
+      % de invocaciones que devuelven un error 500 sintético a propósito (services/_shared/chaos.ts).
+      0 en operación normal. Subirlo (ej. 50) y hacer `sam deploy` es el mecanismo para DEMOSTRAR
+      el rollback automático del Canary: dispara las alarmas durante la ventana del 10% de tráfico
+      y CodeDeploy revierte solo a la versión anterior (rate=0), sin intervención manual.
 
 Globals:
   Function:
@@ -48,6 +63,7 @@ Globals:
     Environment:
       Variables:
         CORS_ORIGIN: !Ref CorsOrigin
+        CHAOS_ERROR_RATE: !Ref ChaosErrorRatePercent
 
 Resources:
   # -----------------------------------------------------------------------
@@ -68,6 +84,11 @@ Resources:
 
   # -----------------------------------------------------------------------
   # Service 1: Intake & Triage
+  # AutoPublishAlias + DeploymentPreference (Fase 4, Opción A): cada `sam
+  # deploy` publica una versión nueva de la función, pero el alias "prod"
+  # (al que apunta API Gateway) solo le manda el 10% del tráfico durante 5
+  # minutos. Si alguna de las 3 alarmas se activa en esa ventana, CodeDeploy
+  # revierte el 100% del tráfico a la versión anterior automáticamente.
   # -----------------------------------------------------------------------
   IntakeTriageFunction:
     Type: AWS::Serverless::Function
@@ -75,6 +96,13 @@ Resources:
       FunctionName: emergencias-intake-triage
       ImageUri: !Ref IntakeTriageImageUri
       Role: !Ref IntakeTriageRoleArn
+      AutoPublishAlias: prod
+      DeploymentPreference:
+        Type: Canary10Percent5Minutes
+        Alarms:
+          - !Ref IntakeTriageErrorsAlarm
+          - !Ref IntakeTriageLatencyAlarm
+          - !Ref Api5xxAlarm
       Events:
         CrearSolicitud:
           Type: HttpApi
@@ -89,6 +117,40 @@ Resources:
             Path: /v1/emergencias/zona/{ciudad}
             Method: GET
 
+  IntakeTriageErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: emergencias-intake-triage-errors
+      AlarmDescription: Errores de Lambda (Service 1) — dispara rollback del canary.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref IntakeTriageFunction
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+  IntakeTriageLatencyAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: emergencias-intake-triage-latency
+      AlarmDescription: Latencia p99 (Service 1) sobre el umbral — dispara rollback del canary.
+      Namespace: AWS/Lambda
+      MetricName: Duration
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref IntakeTriageFunction
+      ExtendedStatistic: p99
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: !Ref LatencyThresholdMs
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+
   # -----------------------------------------------------------------------
   # Service 2: Dispatch & Resource Assignment
   # -----------------------------------------------------------------------
@@ -98,6 +160,13 @@ Resources:
       FunctionName: emergencias-dispatch
       ImageUri: !Ref DispatchImageUri
       Role: !Ref DispatchRoleArn
+      AutoPublishAlias: prod
+      DeploymentPreference:
+        Type: Canary10Percent5Minutes
+        Alarms:
+          - !Ref DispatchErrorsAlarm
+          - !Ref DispatchLatencyAlarm
+          - !Ref Api5xxAlarm
       Events:
         CrearDespacho:
           Type: HttpApi
@@ -112,8 +181,45 @@ Resources:
             Path: /v1/despachos/{id}
             Method: PATCH
 
+  DispatchErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: emergencias-dispatch-errors
+      AlarmDescription: Errores de Lambda (Service 2) — dispara rollback del canary.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref DispatchFunction
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+  DispatchLatencyAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: emergencias-dispatch-latency
+      AlarmDescription: Latencia p99 (Service 2) sobre el umbral — dispara rollback del canary.
+      Namespace: AWS/Lambda
+      MetricName: Duration
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref DispatchFunction
+      ExtendedStatistic: p99
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: !Ref LatencyThresholdMs
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+
   # -----------------------------------------------------------------------
   # Service 3: Geospatial & Zone Aggregation
+  # Latencia con umbral propio (5000ms, no el LatencyThresholdMs general):
+  # el clustering DBSCAN es una operación pesada y 1500ms sería un falso
+  # positivo constante en este endpoint específico.
   # -----------------------------------------------------------------------
   GeospatialFunction:
     Type: AWS::Serverless::Function
@@ -122,6 +228,13 @@ Resources:
       ImageUri: !Ref GeospatialImageUri
       Role: !Ref GeospatialRoleArn
       Timeout: 30 # el clustering puede tardar más que el resto de rutas
+      AutoPublishAlias: prod
+      DeploymentPreference:
+        Type: Canary10Percent5Minutes
+        Alarms:
+          - !Ref GeospatialErrorsAlarm
+          - !Ref GeospatialLatencyAlarm
+          - !Ref Api5xxAlarm
       Events:
         Recalcular:
           Type: HttpApi
@@ -129,6 +242,40 @@ Resources:
             ApiId: !Ref EmergenciasApi
             Path: /v1/geospatial/recalcular
             Method: POST
+
+  GeospatialErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: emergencias-geospatial-errors
+      AlarmDescription: Errores de Lambda (Service 3) — dispara rollback del canary.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref GeospatialFunction
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+  GeospatialLatencyAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: emergencias-geospatial-latency
+      AlarmDescription: Latencia p99 (Service 3) sobre el umbral — dispara rollback del canary.
+      Namespace: AWS/Lambda
+      MetricName: Duration
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref GeospatialFunction
+      ExtendedStatistic: p99
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 5000
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
 
   # -----------------------------------------------------------------------
   # Service 4: Notification & Status Broadcast
@@ -140,6 +287,13 @@ Resources:
       FunctionName: emergencias-notification
       ImageUri: !Ref NotificationImageUri
       Role: !Ref NotificationRoleArn
+      AutoPublishAlias: prod
+      DeploymentPreference:
+        Type: Canary10Percent5Minutes
+        Alarms:
+          - !Ref NotificationErrorsAlarm
+          - !Ref NotificationLatencyAlarm
+          - !Ref Api5xxAlarm
       Events:
         Eventos:
           Type: HttpApi
@@ -147,6 +301,64 @@ Resources:
             ApiId: !Ref EmergenciasApi
             Path: /v1/notificaciones/eventos
             Method: POST
+
+  NotificationErrorsAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: emergencias-notification-errors
+      AlarmDescription: Errores de Lambda (Service 4) — dispara rollback del canary.
+      Namespace: AWS/Lambda
+      MetricName: Errors
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref NotificationFunction
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
+
+  NotificationLatencyAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: emergencias-notification-latency
+      AlarmDescription: Latencia p99 (Service 4) sobre el umbral — dispara rollback del canary.
+      Namespace: AWS/Lambda
+      MetricName: Duration
+      Dimensions:
+        - Name: FunctionName
+          Value: !Ref NotificationFunction
+      ExtendedStatistic: p99
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: !Ref LatencyThresholdMs
+      ComparisonOperator: GreaterThanThreshold
+      TreatMissingData: notBreaching
+
+  # -----------------------------------------------------------------------
+  # Alarma compartida: 5xx agregados del API Gateway (las 4 DeploymentPreference
+  # la referencian). HTTP API v2 publica métricas básicas a AWS/ApiGateway sin
+  # configuración adicional.
+  # -----------------------------------------------------------------------
+  Api5xxAlarm:
+    Type: AWS::CloudWatch::Alarm
+    Properties:
+      AlarmName: emergencias-api-5xx
+      AlarmDescription: Errores 5xx agregados del API Gateway — dispara rollback del canary.
+      Namespace: AWS/ApiGateway
+      MetricName: 5xx
+      Dimensions:
+        - Name: ApiId
+          Value: !Ref EmergenciasApi
+        - Name: Stage
+          Value: prod
+      Statistic: Sum
+      Period: 60
+      EvaluationPeriods: 1
+      Threshold: 1
+      ComparisonOperator: GreaterThanOrEqualToThreshold
+      TreatMissingData: notBreaching
 
   # -----------------------------------------------------------------------
   # Rate limiting por IP (además del throttling agregado del stage de arriba).

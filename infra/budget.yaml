@@ -1,0 +1,45 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Description: >
+  Fase 4, punto 6 del enunciado — Gobernanza de Costos. Presupuesto mensual con límite
+  estricto y 2 alertas por correo (consumo real > 50%, consumo proyectado > 85%). Se
+  despliega UNA vez por cuenta AWS, independiente del ciclo de vida de la API (infra/template.yaml).
+
+Parameters:
+  MonthlyBudgetLimitUSD:
+    Type: Number
+    Default: 10
+    Description: Límite máximo mensual en USD (el enunciado sugiere $10.00)
+  AlertEmail:
+    Type: String
+    Description: Correo que recibe las 2 alertas de presupuesto
+
+Resources:
+  PresupuestoMensual:
+    Type: AWS::Budgets::Budget
+    Properties:
+      Budget:
+        BudgetName: emergencias-presupuesto-mensual
+        BudgetType: COST
+        TimeUnit: MONTHLY
+        BudgetLimit:
+          Amount: !Ref MonthlyBudgetLimitUSD
+          Unit: USD
+      NotificationsWithSubscribers:
+        # Alerta 1: consumo REAL ya superó el 50% del presupuesto.
+        - Notification:
+            NotificationType: ACTUAL
+            ComparisonOperator: GREATER_THAN
+            Threshold: 50
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref AlertEmail
+        # Alerta 2: consumo PROYECTADO (forecast) va a superar el 85% antes de fin de mes.
+        - Notification:
+            NotificationType: FORECASTED
+            ComparisonOperator: GREATER_THAN
+            Threshold: 85
+            ThresholdType: PERCENTAGE
+          Subscribers:
+            - SubscriptionType: EMAIL
+              Address: !Ref AlertEmail
