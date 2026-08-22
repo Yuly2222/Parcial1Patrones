@@ -12,7 +12,7 @@ PostGIS + RLS + Realtime) y frontend en Vercel.
 
 - [x] **Fase 1 — Modelado de Dominio y Base de Datos** ([docs/fase1-modelado-dominio.md](docs/fase1-modelado-dominio.md))
 - [x] **Fase 2 — Dockerización y Microservicios Serverless** ([docs/fase2-dockerizacion-lambda.md](docs/fase2-dockerizacion-lambda.md))
-- [ ] Fase 3 — API Gateway, enrutamiento y Frontend en Vercel
+- [x] **Fase 3 — API Gateway, Enrutamiento y Frontend en Vercel** ([docs/fase3-gateway-frontend.md](docs/fase3-gateway-frontend.md))
 - [ ] Fase 4 — Despliegue progresivo (Canary / Feature Flags) + Gobernanza de costos
 
 ## Estructura
@@ -22,9 +22,11 @@ supabase/
   migrations/   Esquema de base de datos (SQL, reproducible)
   seed.sql      Datos de demostración para desarrollo local
 services/
-  _shared/      Infraestructura común (secretos, cliente Supabase, HTTP, logger)
+  _shared/      Infraestructura común (secretos, cliente Supabase, auth, HTTP, logger)
   intake-triage/  dispatch/  geospatial/  notification/   Los 4 microservicios (Docker + Lambda)
+frontend/       App Vite + React + TS (roles ciudadano/operador, PWA offline-first, mapa)
 infra/
+  template.yaml Definición SAM del API Gateway (rutas, CORS, throttling, WAF)
   iam/          Policies de mínimo privilegio por función Lambda
   scripts/      Bootstrap de configuración/secretos (SSM + Secrets Manager)
 docs/           Documentación técnica por fase (diagramas, decisiones de diseño)
@@ -54,3 +56,15 @@ cd services/intake-triage && npm install && npm run typecheck
 
 Cómo construir/publicar las 4 imágenes a ECR y desplegarlas a Lambda con secretos dinámicos
 (sin `.env`) en [docs/fase2-dockerizacion-lambda.md](docs/fase2-dockerizacion-lambda.md).
+
+## Quick start (frontend)
+
+```bash
+cd frontend
+cp .env.example .env.local   # completar con tus valores (nunca la service_role key)
+npm install
+npm run dev
+```
+
+Cómo desplegar el API Gateway (`infra/template.yaml`), conectar el Database Webhook de
+Supabase y publicar en Vercel en [docs/fase3-gateway-frontend.md](docs/fase3-gateway-frontend.md).

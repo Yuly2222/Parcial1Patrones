@@ -1,0 +1,200 @@
+AWSTemplateFormatVersion: '2010-09-09'
+Transform: AWS::Serverless-2016-10-31
+Description: >
+  Fase 3 — API Gateway (HTTP API, stage prod) enrutando hacia los 4 microservicios
+  en contenedor (Fase 2). Las imágenes ya están publicadas en ECR por
+  services/build-and-push.sh; este template NO construye las imágenes, solo las referencia.
+
+Parameters:
+  IntakeTriageImageUri:
+    Type: String
+    Description: URI de la imagen ECR de intake-triage (tag inmutable, no ":latest")
+  DispatchImageUri:
+    Type: String
+  GeospatialImageUri:
+    Type: String
+  NotificationImageUri:
+    Type: String
+  IntakeTriageRoleArn:
+    Type: String
+    Description: ARN del rol IAM de mínimo privilegio (infra/iam/intake-triage-policy.json)
+  DispatchRoleArn:
+    Type: String
+  GeospatialRoleArn:
+    Type: String
+  NotificationRoleArn:
+    Type: String
+  CorsOrigin:
+    Type: String
+    Description: Dominio de Vercel autorizado por CORS (ej. https://emergencias.vercel.app)
+  ThrottlingRateLimit:
+    Type: Number
+    Default: 50
+    Description: Solicitudes por segundo permitidas en estado estable (throttling del stage)
+  ThrottlingBurstLimit:
+    Type: Number
+    Default: 100
+    Description: Ráfaga máxima permitida antes de empezar a devolver 429
+  RateLimitPorIpCada5Min:
+    Type: Number
+    Default: 300
+    Description: Límite de requests por IP en una ventana de 5 min (regla WAF), mínimo 100
+
+Globals:
+  Function:
+    PackageType: Image
+    Timeout: 10
+    MemorySize: 256
+    Environment:
+      Variables:
+        CORS_ORIGIN: !Ref CorsOrigin
+
+Resources:
+  # -----------------------------------------------------------------------
+  # API Gateway HTTP API — punto único de entrada, stage "prod" formal.
+  # -----------------------------------------------------------------------
+  EmergenciasApi:
+    Type: AWS::Serverless::HttpApi
+    Properties:
+      StageName: prod
+      CorsConfiguration:
+        AllowOrigins: [!Ref CorsOrigin]
+        AllowMethods: [GET, POST, PATCH, OPTIONS]
+        AllowHeaders: [Content-Type, Authorization]
+        MaxAge: 300
+      DefaultRouteSettings:
+        ThrottlingRateLimit: !Ref ThrottlingRateLimit
+        ThrottlingBurstLimit: !Ref ThrottlingBurstLimit
+
+  # -----------------------------------------------------------------------
+  # Service 1: Intake & Triage
+  # -----------------------------------------------------------------------
+  IntakeTriageFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: emergencias-intake-triage
+      ImageUri: !Ref IntakeTriageImageUri
+      Role: !Ref IntakeTriageRoleArn
+      Events:
+        CrearSolicitud:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref EmergenciasApi
+            Path: /v1/emergencias
+            Method: POST
+        ListarPorCiudad:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref EmergenciasApi
+            Path: /v1/emergencias/zona/{ciudad}
+            Method: GET
+
+  # -----------------------------------------------------------------------
+  # Service 2: Dispatch & Resource Assignment
+  # -----------------------------------------------------------------------
+  DispatchFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: emergencias-dispatch
+      ImageUri: !Ref DispatchImageUri
+      Role: !Ref DispatchRoleArn
+      Events:
+        CrearDespacho:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref EmergenciasApi
+            Path: /v1/despachos
+            Method: POST
+        ActualizarDespacho:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref EmergenciasApi
+            Path: /v1/despachos/{id}
+            Method: PATCH
+
+  # -----------------------------------------------------------------------
+  # Service 3: Geospatial & Zone Aggregation
+  # -----------------------------------------------------------------------
+  GeospatialFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: emergencias-geospatial
+      ImageUri: !Ref GeospatialImageUri
+      Role: !Ref GeospatialRoleArn
+      Timeout: 30 # el clustering puede tardar más que el resto de rutas
+      Events:
+        Recalcular:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref EmergenciasApi
+            Path: /v1/geospatial/recalcular
+            Method: POST
+
+  # -----------------------------------------------------------------------
+  # Service 4: Notification & Status Broadcast
+  # (recibe el Database Webhook de Supabase, ver docs/fase3-gateway-frontend.md)
+  # -----------------------------------------------------------------------
+  NotificationFunction:
+    Type: AWS::Serverless::Function
+    Properties:
+      FunctionName: emergencias-notification
+      ImageUri: !Ref NotificationImageUri
+      Role: !Ref NotificationRoleArn
+      Events:
+        Eventos:
+          Type: HttpApi
+          Properties:
+            ApiId: !Ref EmergenciasApi
+            Path: /v1/notificaciones/eventos
+            Method: POST
+
+  # -----------------------------------------------------------------------
+  # Rate limiting por IP (además del throttling agregado del stage de arriba).
+  # HTTP API no soporta Usage Plans/API Keys nativamente (eso es solo REST
+  # API) — el patrón estándar de AWS para "por IP" es WAF con una regla
+  # rate-based, asociada al stage. Mitiga los picos de tráfico concurrente
+  # y ataques de denegación de servicio descritos en el enunciado.
+  # -----------------------------------------------------------------------
+  ApiWebAcl:
+    Type: AWS::WAFv2::WebACL
+    Properties:
+      Name: emergencias-api-waf
+      Scope: REGIONAL
+      DefaultAction:
+        Allow: {}
+      VisibilityConfig:
+        SampledRequestsEnabled: true
+        CloudWatchMetricsEnabled: true
+        MetricName: emergencias-api-waf
+      Rules:
+        - Name: RateLimitPorIp
+          Priority: 1
+          Action:
+            Block: {}
+          Statement:
+            RateBasedStatement:
+              Limit: !Ref RateLimitPorIpCada5Min
+              AggregateKeyType: IP
+          VisibilityConfig:
+            SampledRequestsEnabled: true
+            CloudWatchMetricsEnabled: true
+            MetricName: RateLimitPorIp
+
+  ApiWebAclAssociation:
+    Type: AWS::WAFv2::WebACLAssociation
+    Properties:
+      ResourceArn: !Sub "arn:aws:apigateway:${AWS::Region}::/apis/${EmergenciasApi}/stages/prod"
+      WebACLId: !GetAtt ApiWebAcl.Arn
+
+Outputs:
+  ApiBaseUrl:
+    Description: Endpoint base del API Gateway (stage prod) — usar como VITE_API_BASE_URL en el frontend
+    Value: !Sub "https://${EmergenciasApi}.execute-api.${AWS::Region}.amazonaws.com/prod"
+  IntakeTriageFunctionArn:
+    Value: !GetAtt IntakeTriageFunction.Arn
+  DispatchFunctionArn:
+    Value: !GetAtt DispatchFunction.Arn
+  GeospatialFunctionArn:
+    Value: !GetAtt GeospatialFunction.Arn
+  NotificationFunctionArn:
+    Value: !GetAtt NotificationFunction.Arn

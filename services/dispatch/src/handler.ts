@@ -2,6 +2,7 @@ import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { getSupabaseClient } from './shared/supabaseClient';
 import { jsonResponse, parseJsonBody, withErrorHandling, HttpError } from './shared/http';
 import { logger } from './shared/logger';
+import { getAuthenticatedUser, requireOperador } from './shared/auth';
 import type { EstadoDespacho } from './shared/types';
 
 interface CrearDespachoBody {
@@ -16,10 +17,22 @@ interface CrearDespachoBody {
 // operación sea atómica bajo picos de tráfico concurrente: dos despachos
 // en paralelo nunca pueden robarse la misma cuadrilla.
 async function crearDespacho(event: APIGatewayProxyEventV2) {
+  const usuario = await getAuthenticatedUser(event);
   const body = parseJsonBody<CrearDespachoBody>(event);
   if (!body.solicitud_id) throw new HttpError(400, 'solicitud_id es obligatorio');
 
   const supabase = await getSupabaseClient();
+
+  const { data: solicitud, error: solicitudError } = await supabase
+    .schema('intake')
+    .from('solicitudes')
+    .select('ciudad')
+    .eq('id', body.solicitud_id)
+    .single();
+
+  if (solicitudError || !solicitud) throw new HttpError(404, 'La solicitud no existe');
+  requireOperador(usuario, solicitud.ciudad);
+
   const { data, error } = await supabase.schema('dispatch').rpc('asignar_cuadrilla_cercana', {
     p_solicitud_id: body.solicitud_id,
     p_radio_km: body.radio_km ?? 50,
@@ -46,12 +59,32 @@ async function actualizarDespacho(event: APIGatewayProxyEventV2) {
   const id = event.pathParameters?.id;
   if (!id) throw new HttpError(400, 'Falta el id del despacho en la ruta');
 
+  const usuario = await getAuthenticatedUser(event);
   const body = parseJsonBody<ActualizarDespachoBody>(event);
   if (!ESTADOS_VALIDOS.includes(body.estado)) {
     throw new HttpError(400, `estado inválido: debe ser uno de ${ESTADOS_VALIDOS.join(', ')}`);
   }
 
   const supabase = await getSupabaseClient();
+
+  const { data: despachoActual, error: despachoError } = await supabase
+    .schema('dispatch')
+    .from('despachos')
+    .select('solicitud_id')
+    .eq('id', id)
+    .single();
+
+  if (despachoError || !despachoActual) throw new HttpError(404, 'El despacho no existe');
+
+  const { data: solicitud } = await supabase
+    .schema('intake')
+    .from('solicitudes')
+    .select('ciudad')
+    .eq('id', despachoActual.solicitud_id)
+    .single();
+
+  requireOperador(usuario, solicitud?.ciudad);
+
   const patch: Record<string, unknown> = { estado: body.estado, notas: body.notas ?? null };
   if (body.estado === 'completado') patch.completado_en = new Date().toISOString();
 

@@ -2,6 +2,7 @@ import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { getSupabaseClient } from './shared/supabaseClient';
 import { jsonResponse, parseJsonBody, withErrorHandling, HttpError } from './shared/http';
 import { logger } from './shared/logger';
+import { getAuthenticatedUser, requireOperador } from './shared/auth';
 import { CIUDADES, TIPOS_SOLICITUD, type Ciudad, type TipoSolicitud } from './shared/types';
 
 interface CrearSolicitudBody {
@@ -9,7 +10,6 @@ interface CrearSolicitudBody {
   ciudad: Ciudad;
   latitud: number;
   longitud: number;
-  solicitante_id: string;
   descripcion?: string;
   datos_criticos: Record<string, unknown>;
 }
@@ -24,9 +24,6 @@ function validar(body: CrearSolicitudBody): void {
   if (typeof body.latitud !== 'number' || typeof body.longitud !== 'number') {
     throw new HttpError(400, 'latitud y longitud son obligatorias y deben ser numéricas');
   }
-  if (!body.solicitante_id) {
-    throw new HttpError(400, 'solicitante_id es obligatorio (uuid del usuario autenticado)');
-  }
   if (!body.datos_criticos || typeof body.datos_criticos !== 'object') {
     throw new HttpError(400, 'datos_criticos es obligatorio (objeto con los campos según el tipo)');
   }
@@ -37,6 +34,9 @@ function validar(body: CrearSolicitudBody): void {
 // severidad viven en el trigger intake.aplicar_reglas_triage() (Fase 1);
 // aquí solo se valida la forma básica de la solicitud HTTP antes de tocar la DB.
 async function crearSolicitud(event: APIGatewayProxyEventV2) {
+  // solicitante_id NUNCA viene del body: se toma del JWT verificado para que
+  // nadie pueda radicar una emergencia suplantando a otro ciudadano.
+  const usuario = await getAuthenticatedUser(event);
   const body = parseJsonBody<CrearSolicitudBody>(event);
   validar(body);
 
@@ -52,7 +52,7 @@ async function crearSolicitud(event: APIGatewayProxyEventV2) {
       tipo: body.tipo,
       ciudad: body.ciudad,
       ubicacion: ubicacionEwkt,
-      solicitante_id: body.solicitante_id,
+      solicitante_id: usuario.id,
       descripcion: body.descripcion ?? null,
       datos_criticos: body.datos_criticos,
     })
@@ -81,6 +81,9 @@ async function listarPorCiudad(event: APIGatewayProxyEventV2) {
   if (!ciudad || !CIUDADES.includes(ciudad)) {
     throw new HttpError(400, `ciudad inválida: debe ser una de ${CIUDADES.join(', ')}`);
   }
+
+  const usuario = await getAuthenticatedUser(event);
+  requireOperador(usuario, ciudad);
 
   const supabase = await getSupabaseClient();
   const { data, error } = await supabase

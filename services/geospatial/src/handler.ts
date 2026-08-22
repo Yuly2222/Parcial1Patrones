@@ -2,6 +2,7 @@ import type { APIGatewayProxyEventV2 } from 'aws-lambda';
 import { getSupabaseClient } from './shared/supabaseClient';
 import { jsonResponse, parseJsonBodyOptional, withErrorHandling, HttpError } from './shared/http';
 import { logger } from './shared/logger';
+import { getAuthenticatedUser, requireOperador } from './shared/auth';
 import type { Ciudad } from './shared/types';
 
 interface RecalcularBody {
@@ -32,9 +33,18 @@ async function recalcular(body: RecalcularBody) {
 
 export const handler = withErrorHandling(async (event: APIGatewayProxyEventV2) => {
   const esInvocacionHttp = !!event?.requestContext;
-  const body: RecalcularBody = esInvocacionHttp
-    ? parseJsonBodyOptional<RecalcularBody>(event)
-    : ((event as unknown as RecalcularBody) ?? {});
+
+  let body: RecalcularBody;
+  if (esInvocacionHttp) {
+    // Invocación vía API Gateway: requiere operador (de esa ciudad) o admin.
+    // La invocación programada (EventBridge Scheduler, sin requestContext) es
+    // interna a la cuenta AWS y no pasa por un usuario humano autenticado.
+    const usuario = await getAuthenticatedUser(event);
+    body = parseJsonBodyOptional<RecalcularBody>(event);
+    requireOperador(usuario, body.ciudad);
+  } else {
+    body = (event as unknown as RecalcularBody) ?? {};
+  }
 
   const clusters = await recalcular(body);
   return jsonResponse(200, { clusters });
