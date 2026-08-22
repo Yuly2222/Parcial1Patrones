@@ -272,9 +272,14 @@ correr los comandos ya documentados, y capturar la evidencia (capturas de pantal
 Ya no queda código por escribir para cumplir la rúbrica — lo que falta es **ejecutar** lo ya
 construido contra cuentas reales y documentar esa ejecución. En orden:
 
-1. **Crear las cuentas** (si no existen): AWS (Free Tier) y Vercel.
-2. **Fase 1 remoto**: crear el proyecto en supabase.com, `supabase link` + `supabase db push`
-   (`fase1-modelado-dominio.md`).
+1. **Crear las cuentas** (si no existen): AWS (Free Tier) y Vercel. Supabase ✅ ya está creada.
+2. ~~**Fase 1 remoto**~~ ✅ **Hecho** — proyecto real `parcial1-emergencias` creado en
+   supabase.com (org "Yuly2222 Edu", plan Free), esquema completo cargado vía SQL Editor,
+   esquemas `core/intake/dispatch/geospatial/notification` expuestos en Data API, login
+   anónimo activado. Verificado en el navegador: login ciudadano + creación de perfil
+   funcionan de punta a punta contra el proyecto real. Project URL:
+   `https://epvwsgmtmhddwqacwotr.supabase.co` (la `anon` key pública la tienes en el chat —
+   la vamos a necesitar de nuevo como variable de entorno en Vercel, paso 4).
 3. **Fase 2**: `services/build-and-push.sh` (sube las 4 imágenes a ECR) + crear los roles IAM
    de `infra/iam/*.json` + `infra/scripts/bootstrap-config.sh` (secretos) —
    `fase2-dockerizacion-lambda.md`.
