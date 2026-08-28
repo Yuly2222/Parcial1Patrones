@@ -18,6 +18,10 @@ export async function apiFetch<T>(path: string, init: RequestInit = {}): Promise
 
   if (!response.ok) {
     const body = await response.json().catch(() => ({}) as { error?: string });
+    // El formulario del ciudadano trata cualquier falla como "sin conexión" para no
+    // asustar a alguien reportando una emergencia real — este log es solo para que
+    // quien esté probando/depurando vea la causa real (CORS, 500, etc.) en la consola.
+    console.error(`[apiFetch] ${path} -> ${response.status}`, body.error ?? '(sin cuerpo)');
     throw new Error(body.error ?? `Error ${response.status}`);
   }
   return response.json() as Promise<T>;
