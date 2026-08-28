@@ -1,0 +1,68 @@
+name: CI (typecheck + build)
+
+on:
+  pull_request:
+    branches: [main]
+  workflow_dispatch: {}
+
+jobs:
+  frontend:
+    name: Frontend — typecheck + build
+    runs-on: ubuntu-latest
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Instalar dependencias
+        working-directory: frontend
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: frontend
+        run: npm run typecheck
+
+      - name: Build
+        working-directory: frontend
+        run: npm run build
+
+  services:
+    name: "${{ matrix.service }} — typecheck + build"
+    runs-on: ubuntu-latest
+    strategy:
+      fail-fast: false
+      matrix:
+        service: [intake-triage, dispatch, geospatial, notification]
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: "20"
+          cache: "npm"
+          cache-dependency-path: services/${{ matrix.service }}/package-lock.json
+
+      # tsc necesita services/<servicio>/src/shared, que no está en el repo
+      # (ver .gitignore) — se regenera igual que en desarrollo local.
+      - name: Sincronizar services/_shared
+        run: node services/sync-shared.js
+
+      - name: Instalar dependencias
+        working-directory: services/${{ matrix.service }}
+        run: npm ci
+
+      - name: Typecheck
+        working-directory: services/${{ matrix.service }}
+        run: npm run typecheck
+
+      - name: Build
+        working-directory: services/${{ matrix.service }}
+        run: npm run build
