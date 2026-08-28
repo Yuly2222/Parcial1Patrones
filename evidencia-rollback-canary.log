@@ -1,0 +1,130 @@
+
+	Managed S3 bucket: aws-sam-cli-managed-default-samclisourcebucket-8iyfiuywlab8
+	Auto resolution of buckets can be turned off by setting resolve_s3=False
+	To use a specific S3 bucket, set --s3-bucket=<bucket_name>
+	Above settings can be stored in samconfig.toml
+
+	File with same data already exists at 138e8a54ca668659cc20d71984ecb0ca.template, skipping upload
+
+	Deploying with following values
+	===============================
+	Stack name                   : emergencias-api
+	Region                       : us-east-1
+	Confirm changeset            : False
+	Disable rollback             : False
+	Deployment image repository  : 
+                                       {
+                                           "IntakeTriageFunction": "155936381481.dkr.ecr.us-east-1.amazonaws.com/emergenciasapic4c0c17c/intaketriagefunctionff71beb2repo",
+                                           "DispatchFunction": "155936381481.dkr.ecr.us-east-1.amazonaws.com/emergenciasapic4c0c17c/dispatchfunction217b8d00repo",
+                                           "GeospatialFunction": "155936381481.dkr.ecr.us-east-1.amazonaws.com/emergenciasapic4c0c17c/geospatialfunctionf216f5aarepo",
+                                           "NotificationFunction": "155936381481.dkr.ecr.us-east-1.amazonaws.com/emergenciasapic4c0c17c/notificationfunctionee6650berepo"
+                                       }
+	Deployment s3 bucket         : aws-sam-cli-managed-default-samclisourcebucket-8iyfiuywlab8
+	Capabilities                 : ["CAPABILITY_IAM", "CAPABILITY_AUTO_EXPAND"]
+	Parameter overrides          : {"IntakeTriageImageUri": "155936381481.dkr.ecr.us-east-1.amazonaws.com/emergencias/intake-triage:chaos-demo", "DispatchImageUri": "155936381481.dkr.ecr.us-east-1.amazonaws.com/emergencias/dispatch:9f5d092", "GeospatialImageUri": "155936381481.dkr.ecr.us-east-1.amazonaws.com/emergencias/geospatial:9f5d092", "NotificationImageUri": "155936381481.dkr.ecr.us-east-1.amazonaws.com/emergencias/notification:9f5d092", "IntakeTriageRoleArn": "arn:aws:iam::155936381481:role/emergencias-intake-triage-role", "DispatchRoleArn": "arn:aws:iam::155936381481:role/emergencias-dispatch-role", "GeospatialRoleArn": "arn:aws:iam::155936381481:role/emergencias-geospatial-role", "NotificationRoleArn": "arn:aws:iam::155936381481:role/emergencias-notification-role", "CorsOrigin": "https://parcial1-patrones.vercel.app", "ChaosErrorRatePercent": "50"}
+	Signing Profiles             : {}
+
+Initiating deployment
+=====================
+
+
+	File with same data already exists at d7bbb8d7f3876d07685c4815c43f7362.template, skipping upload
+
+
+Waiting for changeset to be created..
+
+CloudFormation stack changeset
+-------------------------------------------------------------------------------------------------
+Operation                LogicalResourceId        ResourceType             Replacement            
+-------------------------------------------------------------------------------------------------
++ Add                    IntakeTriageFunctionVe   AWS::Lambda::Version     N/A                    
+                         rsion2885c4a01b                                                          
+* Modify                 DispatchFunction         AWS::Lambda::Function    False                  
+* Modify                 GeospatialFunction       AWS::Lambda::Function    False                  
+* Modify                 IntakeTriageFunctionAl   AWS::Lambda::Alias       False                  
+                         iasprod                                                                  
+* Modify                 IntakeTriageFunction     AWS::Lambda::Function    False                  
+* Modify                 NotificationFunction     AWS::Lambda::Function    False                  
+- Delete                 IntakeTriageFunctionVe   AWS::Lambda::Version     N/A                    
+                         rsionc0d0b672d6                                                          
+-------------------------------------------------------------------------------------------------
+
+
+Changeset created successfully. arn:aws:cloudformation:us-east-1:155936381481:changeSet/samcli-deploy1787939924/be093146-dbb3-41ab-957e-3471b03e800a
+
+
+2026-08-28 12:59:06 - Waiting for stack create/update to complete
+
+CloudFormation events from stack operations (refresh every 5.0 seconds)
+-------------------------------------------------------------------------------------------------
+ResourceStatus           ResourceType             LogicalResourceId        ResourceStatusReason   
+-------------------------------------------------------------------------------------------------
+UPDATE_IN_PROGRESS       AWS::CloudFormation::S   emergencias-api          User Initiated         
+                         tack                                                                     
+UPDATE_IN_PROGRESS       AWS::Lambda::Function    DispatchFunction         -                      
+UPDATE_IN_PROGRESS       AWS::Lambda::Function    NotificationFunction     -                      
+UPDATE_IN_PROGRESS       AWS::Lambda::Function    GeospatialFunction       -                      
+UPDATE_IN_PROGRESS       AWS::Lambda::Function    IntakeTriageFunction     -                      
+UPDATE_COMPLETE          AWS::Lambda::Function    DispatchFunction         -                      
+UPDATE_COMPLETE          AWS::Lambda::Function    NotificationFunction     -                      
+UPDATE_COMPLETE          AWS::Lambda::Function    GeospatialFunction       -                      
+UPDATE_COMPLETE          AWS::Lambda::Function    IntakeTriageFunction     -                      
+CREATE_IN_PROGRESS       AWS::Lambda::Version     IntakeTriageFunctionVe   -                      
+                                                  rsion2885c4a01b                                 
+CREATE_IN_PROGRESS       AWS::Lambda::Version     IntakeTriageFunctionVe   Resource creation      
+                                                  rsion2885c4a01b          Initiated              
+CREATE_COMPLETE          AWS::Lambda::Version     IntakeTriageFunctionVe   -                      
+                                                  rsion2885c4a01b                                 
+UPDATE_IN_PROGRESS       AWS::Lambda::Alias       IntakeTriageFunctionAl   -                      
+                                                  iasprod                                         
+UPDATE_IN_PROGRESS       AWS::Lambda::Alias       IntakeTriageFunctionAl   CodeDeploy deployment  
+                                                  iasprod                  started: d-FWT4DH7EL   
+UPDATE_IN_PROGRESS       AWS::Lambda::Alias       IntakeTriageFunctionAl   CodeDeploy deployment  
+                                                  iasprod                  started: d-FWT4DH7EL   
+UPDATE_IN_PROGRESS       AWS::Lambda::Alias       IntakeTriageFunctionAl   CodeDeploy rollback    
+                                                  iasprod                  deployment started:    
+                                                                           d-SO3RUB8EL            
+UPDATE_FAILED            AWS::Lambda::Alias       IntakeTriageFunctionAl   Resource handler       
+                                                  iasprod                  returned message:      
+                                                                           "d-FWT4DH7EL failed.   
+                                                                           One or more alarms     
+                                                                           have been activated    
+                                                                           according to the       
+                                                                           Amazon CloudWatch      
+                                                                           metrics you selected,  
+                                                                           and the affected       
+                                                                           deployments have been  
+                                                                           stopped. Activated     
+                                                                           alarms: <emergencias-  
+                                                                           intake-triage-         
+                                                                           latency>"              
+                                                                           (RequestToken: bae1f03 
+                                                                           d-6494-5af4-11b5-      
+                                                                           5306f53b9876,          
+                                                                           HandlerErrorCode:      
+                                                                           InternalFailure)       
+UPDATE_ROLLBACK_IN_PRO   AWS::CloudFormation::S   emergencias-api          The following          
+GRESS                    tack                                              resource(s) failed to  
+                                                                           update: [IntakeTriageF 
+                                                                           unctionAliasprod].     
+UPDATE_IN_PROGRESS       AWS::Lambda::Function    NotificationFunction     -                      
+UPDATE_IN_PROGRESS       AWS::Lambda::Function    DispatchFunction         -                      
+UPDATE_IN_PROGRESS       AWS::Lambda::Function    GeospatialFunction       -                      
+UPDATE_IN_PROGRESS       AWS::Lambda::Function    IntakeTriageFunction     -                      
+UPDATE_COMPLETE          AWS::Lambda::Function    DispatchFunction         -                      
+UPDATE_COMPLETE          AWS::Lambda::Function    GeospatialFunction       -                      
+UPDATE_COMPLETE          AWS::Lambda::Function    NotificationFunction     -                      
+UPDATE_COMPLETE          AWS::Lambda::Function    IntakeTriageFunction     -                      
+UPDATE_IN_PROGRESS       AWS::Lambda::Alias       IntakeTriageFunctionAl   -                      
+                                                  iasprod                                         
+UPDATE_COMPLETE          AWS::Lambda::Alias       IntakeTriageFunctionAl   -                      
+                                                  iasprod                                         
+UPDATE_ROLLBACK_COMPLE   AWS::CloudFormation::S   emergencias-api          -                      
+TE_CLEANUP_IN_PROGRESS   tack                                                                     
+DELETE_SKIPPED           AWS::Lambda::Version     IntakeTriageFunctionVe   -                      
+                                                  rsion2885c4a01b                                 
+UPDATE_ROLLBACK_COMPLE   AWS::CloudFormation::S   emergencias-api          -                      
+TE                       tack                                                                     
+-------------------------------------------------------------------------------------------------
+
+Error: Failed to create/update the stack: emergencias-api, Waiter StackUpdateComplete failed: Waiter encountered a terminal failure state: For expression "Stacks[].StackStatus" we matched expected path: "UPDATE_ROLLBACK_COMPLETE" at least once
