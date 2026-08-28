@@ -1,0 +1,66 @@
+name: Deploy backend (ECR + SAM)
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "services/**"
+      - "infra/template.yaml"
+      - ".github/workflows/deploy-backend.yml"
+  workflow_dispatch: {}
+
+env:
+  AWS_REGION: us-east-1
+  CORS_ORIGIN: https://parcial1-patrones.vercel.app
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Configurar credenciales AWS
+        uses: aws-actions/configure-aws-credentials@v4
+        with:
+          aws-access-key-id: ${{ secrets.AWS_ACCESS_KEY_ID }}
+          aws-secret-access-key: ${{ secrets.AWS_SECRET_ACCESS_KEY }}
+          aws-region: ${{ env.AWS_REGION }}
+
+      - name: Cuenta AWS
+        id: account
+        run: echo "id=$(aws sts get-caller-identity --query Account --output text)" >> "$GITHUB_OUTPUT"
+
+      - name: Build + push de las 4 imágenes a ECR
+        run: |
+          chmod +x services/build-and-push.sh
+          AWS_REGION="${{ env.AWS_REGION }}" ./services/build-and-push.sh
+
+      - name: Instalar SAM CLI
+        uses: aws-actions/setup-sam@v2
+
+      - name: sam deploy
+        run: |
+          TAG=$(git rev-parse --short HEAD)
+          ACCOUNT_ID="${{ steps.account.outputs.id }}"
+          sam deploy \
+            --template-file infra/template.yaml \
+            --stack-name emergencias-api \
+            --capabilities CAPABILITY_IAM CAPABILITY_AUTO_EXPAND \
+            --resolve-s3 \
+            --resolve-image-repos \
+            --region "${{ env.AWS_REGION }}" \
+            --no-confirm-changeset \
+            --no-fail-on-empty-changeset \
+            --parameter-overrides \
+              IntakeTriageImageUri="${ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/emergencias/intake-triage:${TAG}" \
+              DispatchImageUri="${ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/emergencias/dispatch:${TAG}" \
+              GeospatialImageUri="${ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/emergencias/geospatial:${TAG}" \
+              NotificationImageUri="${ACCOUNT_ID}.dkr.ecr.${{ env.AWS_REGION }}.amazonaws.com/emergencias/notification:${TAG}" \
+              IntakeTriageRoleArn="arn:aws:iam::${ACCOUNT_ID}:role/emergencias-intake-triage-role" \
+              DispatchRoleArn="arn:aws:iam::${ACCOUNT_ID}:role/emergencias-dispatch-role" \
+              GeospatialRoleArn="arn:aws:iam::${ACCOUNT_ID}:role/emergencias-geospatial-role" \
+              NotificationRoleArn="arn:aws:iam::${ACCOUNT_ID}:role/emergencias-notification-role" \
+              CorsOrigin="${{ env.CORS_ORIGIN }}"
