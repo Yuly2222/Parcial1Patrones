@@ -11,7 +11,7 @@
       "Sid": "ConfigNoSensible",
       "Effect": "Allow",
       "Action": ["ssm:GetParametersByPath", "ssm:GetParameter", "ssm:GetParameters"],
-      "Resource": "arn:aws:ssm:{{REGION}}:{{ACCOUNT_ID}}:parameter/emergencias/prod/common/*"
+      "Resource": ["arn:aws:ssm:{{REGION}}:{{ACCOUNT_ID}}:parameter/emergencias/prod/common", "arn:aws:ssm:{{REGION}}:{{ACCOUNT_ID}}:parameter/emergencias/prod/common/*"]
     },
     {
       "Sid": "CredencialSupabase",
