@@ -66,3 +66,4 @@ jobs:
       - name: Build
         working-directory: services/${{ matrix.service }}
         run: npm run build
+
