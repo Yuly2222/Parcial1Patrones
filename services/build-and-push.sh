@@ -29,7 +29,7 @@ for service in "${TARGETS[@]}"; do
   tag="${REGISTRY}/${repo}:$(git -C "${SCRIPT_DIR}/.." rev-parse --short HEAD 2>/dev/null || date +%s)"
 
   echo "==> Construyendo ${service} -> ${tag}"
-  docker build -f "${SCRIPT_DIR}/${service}/Dockerfile" -t "${tag}" -t "${REGISTRY}/${repo}:latest" "${SCRIPT_DIR}"
+  docker build --provenance=false --sbom=false -f "${SCRIPT_DIR}/${service}/Dockerfile" -t "${tag}" -t "${REGISTRY}/${repo}:latest" "${SCRIPT_DIR}"
 
   echo "==> Publicando ${service}"
   docker push "${tag}"

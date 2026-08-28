@@ -57,7 +57,6 @@ Parameters:
 
 Globals:
   Function:
-    PackageType: Image
     Timeout: 10
     MemorySize: 256
     Environment:
@@ -93,6 +92,7 @@ Resources:
   IntakeTriageFunction:
     Type: AWS::Serverless::Function
     Properties:
+      PackageType: Image
       FunctionName: emergencias-intake-triage
       ImageUri: !Ref IntakeTriageImageUri
       Role: !Ref IntakeTriageRoleArn
@@ -102,7 +102,6 @@ Resources:
         Alarms:
           - !Ref IntakeTriageErrorsAlarm
           - !Ref IntakeTriageLatencyAlarm
-          - !Ref Api5xxAlarm
       Events:
         CrearSolicitud:
           Type: HttpApi
@@ -157,6 +156,7 @@ Resources:
   DispatchFunction:
     Type: AWS::Serverless::Function
     Properties:
+      PackageType: Image
       FunctionName: emergencias-dispatch
       ImageUri: !Ref DispatchImageUri
       Role: !Ref DispatchRoleArn
@@ -166,7 +166,6 @@ Resources:
         Alarms:
           - !Ref DispatchErrorsAlarm
           - !Ref DispatchLatencyAlarm
-          - !Ref Api5xxAlarm
       Events:
         CrearDespacho:
           Type: HttpApi
@@ -224,6 +223,7 @@ Resources:
   GeospatialFunction:
     Type: AWS::Serverless::Function
     Properties:
+      PackageType: Image
       FunctionName: emergencias-geospatial
       ImageUri: !Ref GeospatialImageUri
       Role: !Ref GeospatialRoleArn
@@ -234,7 +234,6 @@ Resources:
         Alarms:
           - !Ref GeospatialErrorsAlarm
           - !Ref GeospatialLatencyAlarm
-          - !Ref Api5xxAlarm
       Events:
         Recalcular:
           Type: HttpApi
@@ -284,6 +283,7 @@ Resources:
   NotificationFunction:
     Type: AWS::Serverless::Function
     Properties:
+      PackageType: Image
       FunctionName: emergencias-notification
       ImageUri: !Ref NotificationImageUri
       Role: !Ref NotificationRoleArn
@@ -293,7 +293,6 @@ Resources:
         Alarms:
           - !Ref NotificationErrorsAlarm
           - !Ref NotificationLatencyAlarm
-          - !Ref Api5xxAlarm
       Events:
         Eventos:
           Type: HttpApi
@@ -391,12 +390,6 @@ Resources:
             SampledRequestsEnabled: true
             CloudWatchMetricsEnabled: true
             MetricName: RateLimitPorIp
-
-  ApiWebAclAssociation:
-    Type: AWS::WAFv2::WebACLAssociation
-    Properties:
-      ResourceArn: !Sub "arn:aws:apigateway:${AWS::Region}::/apis/${EmergenciasApi}/stages/prod"
-      WebACLId: !GetAtt ApiWebAcl.Arn
 
 Outputs:
   ApiBaseUrl:
