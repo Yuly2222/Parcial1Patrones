@@ -57,7 +57,7 @@ Parameters:
 
 Globals:
   Function:
-    Timeout: 10
+    Timeout: 25
     MemorySize: 256
     Environment:
       Variables:
@@ -145,7 +145,7 @@ Resources:
           Value: !Ref IntakeTriageFunction
       ExtendedStatistic: p99
       Period: 60
-      EvaluationPeriods: 1
+      EvaluationPeriods: 2
       Threshold: !Ref LatencyThresholdMs
       ComparisonOperator: GreaterThanThreshold
       TreatMissingData: notBreaching
@@ -209,7 +209,7 @@ Resources:
           Value: !Ref DispatchFunction
       ExtendedStatistic: p99
       Period: 60
-      EvaluationPeriods: 1
+      EvaluationPeriods: 2
       Threshold: !Ref LatencyThresholdMs
       ComparisonOperator: GreaterThanThreshold
       TreatMissingData: notBreaching
@@ -271,7 +271,7 @@ Resources:
           Value: !Ref GeospatialFunction
       ExtendedStatistic: p99
       Period: 60
-      EvaluationPeriods: 1
+      EvaluationPeriods: 2
       Threshold: 5000
       ComparisonOperator: GreaterThanThreshold
       TreatMissingData: notBreaching
@@ -330,7 +330,7 @@ Resources:
           Value: !Ref NotificationFunction
       ExtendedStatistic: p99
       Period: 60
-      EvaluationPeriods: 1
+      EvaluationPeriods: 2
       Threshold: !Ref LatencyThresholdMs
       ComparisonOperator: GreaterThanThreshold
       TreatMissingData: notBreaching

@@ -11,11 +11,13 @@
   "dependencies": {
     "@aws-sdk/client-secrets-manager": "^3.700.0",
     "@aws-sdk/client-ssm": "^3.700.0",
-    "@supabase/supabase-js": "^2.45.4"
+    "@supabase/supabase-js": "^2.45.4",
+    "ws": "^8.18.0"
   },
   "devDependencies": {
     "@types/aws-lambda": "^8.10.145",
     "@types/node": "^20.14.9",
-    "typescript": "^5.5.4"
+    "typescript": "^5.5.4",
+    "@types/ws": "^8.5.12"
   }
 }
