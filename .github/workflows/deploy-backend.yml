@@ -63,4 +63,5 @@ jobs:
               DispatchRoleArn="arn:aws:iam::${ACCOUNT_ID}:role/emergencias-dispatch-role" \
               GeospatialRoleArn="arn:aws:iam::${ACCOUNT_ID}:role/emergencias-geospatial-role" \
               NotificationRoleArn="arn:aws:iam::${ACCOUNT_ID}:role/emergencias-notification-role" \
-              CorsOrigin="${{ env.CORS_ORIGIN }}"
+              CorsOrigin="${{ env.CORS_ORIGIN }}" \
+              ChaosErrorRatePercent=0
