@@ -18,7 +18,7 @@ create or replace function dispatch.asignar_cuadrilla_cercana(
 )
 returns dispatch.despachos
 language plpgsql
-set search_path = dispatch, intake, pg_temp
+set search_path = dispatch, intake, public, pg_temp
 as $$
 declare
   v_solicitud intake.solicitudes%rowtype;
@@ -41,7 +41,7 @@ begin
   from dispatch.cuadrillas
   where ciudad = v_solicitud.ciudad
     and estado = 'disponible'
-    and st_dwithin(ubicacion_actual, v_solicitud.ubicacion, p_radio_km * 1000)
+    and st_dwithin(ubicacion_actual, v_solicitud.ubicacion, (p_radio_km * 1000)::double precision)
   order by st_distance(ubicacion_actual, v_solicitud.ubicacion)
   limit 1
   for update skip locked;
