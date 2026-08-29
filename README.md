@@ -19,7 +19,8 @@ conecta con la rúbrica, y qué falta. Léelo antes de tocar cualquier archivo.
 - [x] **Fase 2 — Dockerización y Microservicios Serverless** ([docs/fase2-dockerizacion-lambda.md](docs/fase2-dockerizacion-lambda.md))
 - [x] **Fase 3 — API Gateway, Enrutamiento y Frontend en Vercel** ([docs/fase3-gateway-frontend.md](docs/fase3-gateway-frontend.md))
 - [x] **Fase 4 — Despliegue Progresivo (Canary) y Gobernanza de Costos** ([docs/fase4-canary-costos.md](docs/fase4-canary-costos.md))
-- [x] **CI/CD** — GitHub Actions despliega backend automáticamente en cada push a `main`
+- [x] **CI** — GitHub Actions valida (typecheck + build) frontend y los 4 microservicios en cada Pull Request hacia `main`
+- [x] **CD** — GitHub Actions despliega backend automáticamente en cada push a `main`
 - [x] **Rollback automático demostrado** — ver `evidencia-rollback-canary.log`
 
 ## Despliegue en producción
@@ -27,7 +28,11 @@ conecta con la rúbrica, y qué falta. Léelo antes de tocar cualquier archivo.
 - **API Gateway (stage `prod`)**: `https://dswkbisvd5.execute-api.us-east-1.amazonaws.com/prod`
 - **Frontend (Vercel)**: `https://parcial1-patrones.vercel.app`
 - **Stack CloudFormation**: `emergencias-api` (backend) y `emergencias-budget` (AWS Budgets), región `us-east-1`
-- **CI/CD**: `.github/workflows/deploy-backend.yml` — en cada push a `main` que toque
+- **CI**: `.github/workflows/ci.yml` — en cada Pull Request hacia `main`, corre `typecheck`
+  y `build` del frontend y de los 4 microservicios en paralelo (matrix); no toca AWS, no
+  requiere secretos. Con branch protection activado en `main` (ver Quick start), un PR con
+  algún job en rojo no se puede mergear
+- **CD**: `.github/workflows/deploy-backend.yml` — en cada push a `main` que toque
   `services/` o `infra/template.yaml`, reconstruye y publica las 4 imágenes a ECR y corre
   `sam deploy` (Canary + alarmas se aplican automáticamente en cada despliegue)
 
@@ -69,7 +74,7 @@ budget.yaml AWS Budgets (presupuesto mensual + 2 alertas por correo)
 iam/ Policies de mínimo privilegio por función Lambda
 scripts/ Bootstrap de configuración/secretos (SSM + Secrets Manager) y creación de roles IAM
 .github/
-workflows/ CI/CD — build + push a ECR y sam deploy en cada push a main
+workflows/ ci.yml (validación en PRs) y deploy-backend.yml (build + push a ECR y sam deploy en push a main)
 docs/ Documentación técnica por fase (diagramas, decisiones de diseño)
 
 
@@ -118,6 +123,13 @@ y cómo desplegar el presupuesto de AWS Budgets en
 [docs/fase4-canary-costos.md](docs/fase4-canary-costos.md).
 
 ## Quick start (CI/CD)
+
+Cada Pull Request hacia `main` dispara `.github/workflows/ci.yml`: typecheck + build del
+frontend y de los 4 microservicios en paralelo. No requiere secretos. Para que un PR con un
+job en rojo no se pueda mergear, hay que activarlo como check obligatorio en
+**Settings → Branches → Add branch protection rule** (`main` → *Require status checks to
+pass before merging*); las opciones solo aparecen en el buscador después de la primera
+corrida del workflow (por ejemplo, abriendo un PR o disparándolo manualmente).
 
 El backend se despliega solo en cada push a `main` vía GitHub Actions
 (`.github/workflows/deploy-backend.yml`). Requiere dos secretos configurados en
