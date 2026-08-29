@@ -2,8 +2,14 @@ import type { APIGatewayProxyEventV2, APIGatewayProxyStructuredResultV2 } from '
 import { logger } from './logger';
 import { maybeInjectChaos } from './chaos';
 
+const corsOrigin = (
+  globalThis as typeof globalThis & {
+    process?: { env?: Record<string, string | undefined> };
+  }
+).process?.env?.CORS_ORIGIN ?? 'https://TU-APP.vercel.app';
+
 const CORS_HEADERS = {
-  'Access-Control-Allow-Origin': process.env.CORS_ORIGIN ?? 'https://TU-APP.vercel.app',
+  'Access-Control-Allow-Origin': corsOrigin,
   'Access-Control-Allow-Headers': 'Content-Type,Authorization',
   'Access-Control-Allow-Methods': 'GET,POST,PATCH,OPTIONS',
 };
